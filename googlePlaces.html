@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .pac-container {
+      z-index: 50 !important;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="font-sans bg-gray-50 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Business Finder</h1>
+      <p class="text-gray-600 max-w-lg mx-auto">
+        Discover Google My Business verified establishments with complete contact information
+      </p>
+    </header>
+
+    <!-- Search Section -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input 
+          id="search-input" 
+          type="text" 
+          class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+          placeholder="Search for businesses (e.g. 'restaurants', 'plumbers', 'hotels')"
+        >
+      </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="hidden flex flex-col items-center justify-center py-12">
+      <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-4 text-gray-600">Searching for businesses...</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results" class="space-y-4"></div>
+
+    <!-- No Results Placeholder -->
+    <div id="no-results" class="hidden text-center py-12">
+      <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <h3 class="mt-2 text-lg font-medium text-gray-900">No businesses found</h3>
+      <p class="mt-1 text-gray-500">Try a different search term or location.</p>
+    </div>
+  </div>
+
+  <script>
+    function loadGoogleMapsAPI() {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAd82NAfwN5FvYsHlssf1kWPcdlc1Ns_hs&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = initialize;
+      document.head.appendChild(script);
+    }
+
+    window.onload = loadGoogleMapsAPI;
+
+    let placesService;
+    let map;
+    let searchTimer;
+
+    function initialize() {
+      map = new google.maps.Map(document.createElement('div'), {
+        center: {lat: -34.397, lng: 150.644},
+        zoom: 8
+      });
+      placesService = new google.maps.places.PlacesService(map);
+
+      const searchInput = document.getElementById('search-input');
+      searchInput.addEventListener('input', handleSearchInput);
+    }
+
+    function handleSearchInput(e) {
+      clearTimeout(searchTimer);
+      const query = e.target.value.trim();
+      
+      if (query.length < 3) {
+        document.getElementById('results').innerHTML = '';
+        document.getElementById('no-results').classList.add('hidden');
+        return;
+      }
+
+      searchTimer = setTimeout(() => {
+        searchBusinesses(query);
+      }, 500);
+    }
+
+    function searchBusinesses(query) {
+      showLoading(true);
+      document.getElementById('results').innerHTML = '';
+      document.getElementById('no-results').classList.add('hidden');
+
+      // First try a text search (for business names)
+      placesService.textSearch({
+        query: query,
+        fields: ['name', 'formatted_address', 'place_id', 'types', 'rating', 'user_ratings_total', 'photos', 'geometry', 'icon']
+      }, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+          filterAndDisplayGMB(results);
+        } else {
+          // If text search fails, try a nearby search with the query as the type
+          tryNearbySearch(query);
+        }
+      });
+    }
+
+    function tryNearbySearch(query) {
+      placesService.nearbySearch({
+        keyword: query,
+        radius: 5000,
+        fields: ['name', 'formatted_address', 'place_id', 'types', 'rating', 'user_ratings_total', 'photos', 'geometry', 'icon']
+      }, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK) {
+          filterAndDisplayGMB(results);
+        } else {
+          showNoResults();
+        }
+      });
+    }
+
+    function filterAndDisplayGMB(businesses) {
+      showLoading(false);
+      
+      const gmbBusinesses = businesses.filter(b => 
+        b.types && 
+        b.types.includes('establishment') && 
+        b.name && 
+        b.formatted_address
+      );
+
+      if (gmbBusinesses.length === 0) {
+        showNoResults();
+        return;
+      }
+
+      displayResults(gmbBusinesses);
+    }
+
+    function displayResults(businesses) {
+      const resultsContainer = document.getElementById('results');
+      resultsContainer.innerHTML = '';
+      
+      businesses.forEach(business => {
+        const businessCard = document.createElement('div');
+        businessCard.className = 'bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200';
+        
+        let cardContent = `
+          <div class="p-6">
+            <div class="flex items-start">
+              ${business.icon ? `
+                <img src="${business.icon}" alt="${business.name}" class="h-12 w-12 rounded-md object-cover mr-4">
+              ` : `
+                <div class="h-12 w-12 rounded-md bg-gray-200 flex items-center justify-center mr-4">
+                  <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+              `}
+              <div class="flex-1">
+                <h3 class="text-lg font-semibold text-gray-900 mb-1">${business.name}</h3>
+                <p class="text-gray-600 text-sm mb-2">${business.formatted_address}</p>
+                ${business.types ? `
+                  <div class="flex flex-wrap gap-1 mb-3">
+                    ${business.types
+                      .filter(t => t !== 'establishment' && t !== 'point_of_interest')
+                      .map(type => `
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          ${type.replace(/_/g, ' ')}
+                        </span>
+                      `).join('')}
+                  </div>
+                ` : ''}
+                ${business.rating ? `
+                  <div class="flex items-center mb-3">
+                    <div class="flex items-center">
+                      ${Array.from({length: 5}, (_, i) => `
+                        <svg class="h-4 w-4 ${i < Math.floor(business.rating) ? 'text-yellow-400' : 'text-gray-300'}" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      `).join('')}
+                      <span class="ml-1 text-sm font-medium text-gray-700">
+                        ${business.rating} (${business.user_ratings_total || 0} reviews)
+                      </span>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-3">
+              <a href="https://www.google.com/maps/place/?q=place_id:${business.place_id}" 
+                 target="_blank" 
+                 class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                View on Map
+              </a>
+              <div id="business-details-${business.place_id}">
+                <button onclick="loadBusinessDetails('${business.place_id}')" 
+                  class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                  Load Details
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        businessCard.innerHTML = cardContent;
+        resultsContainer.appendChild(businessCard);
+      });
+    }
+
+    function loadBusinessDetails(placeId) {
+      const detailsContainer = document.getElementById(`business-details-${placeId}`);
+      detailsContainer.innerHTML = `
+        <div class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-300">
+          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Loading...
+        </div>
+      `;
+
+      placesService.getDetails({
+        placeId: placeId,
+        fields: ['website', 'formatted_phone_number', 'opening_hours', 'photos']
+      }, (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK) {
+          let detailsHTML = '';
+          
+          if (place.website) {
+            detailsHTML += `
+              <a href="${place.website}" target="_blank" 
+                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-2">
+                <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                Visit Website
+              </a>
+            `;
+          } else {
+            detailsHTML += `
+              <span class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-500 bg-gray-100 mr-2">
+                <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                No Website
+              </span>
+            `;
+          }
+
+          if (place.formatted_phone_number) {
+            detailsHTML += `
+              <a href="tel:${place.formatted_phone_number}" 
+                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-2">
+                <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                ${place.formatted_phone_number}
+              </a>
+            `;
+          } else {
+            detailsHTML += `
+              <span class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-500 bg-gray-100 mr-2">
+                <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                No Phone
+              </span>
+            `;
+          }
+
+          if (place.photos && place.photos.length > 0) {
+            detailsHTML += `
+              <button onclick="showPhotoModal('${placeId}')"
+                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                View Photos
+              </button>
+            `;
+          }
+
+          detailsContainer.innerHTML = detailsHTML;
+        } else {
+          detailsContainer.innerHTML = `
+            <span class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-500 bg-gray-100">
+              Failed to load details
+            </span>
+          `;
+        }
+      });
+    }
+
+    function showPhotoModal(placeId) {
+      alert('Photo modal would show here for place: ' + placeId);
+    }
+
+    function showNoResults() {
+      showLoading(false);
+      document.getElementById('no-results').classList.remove('hidden');
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').classList.toggle('hidden', !show);
+    }
+  </script>
+</body>
+</html>

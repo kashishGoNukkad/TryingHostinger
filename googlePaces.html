@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Google Places Autocomplete</title>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAd82NAfwN5FvYsHlssf1kWPcdlc1Ns_hs&libraries=places"
+      async
+      defer
+    ></script>
+    <script>
+      function initAutocomplete() {
+        const input = document.getElementById("autocomplete");
+        new google.maps.places.Autocomplete(input);
+      }
+
+      window.initAutocomplete = initAutocomplete;
+    </script>
+  </head>
+  <body onload="initAutocomplete()">
+    <h2>Search a place:</h2>
+    <input id="autocomplete" type="text" placeholder="Enter a location" style="width: 300px;" />
+  </body>
+</html>
