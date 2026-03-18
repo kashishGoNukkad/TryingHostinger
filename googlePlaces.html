@@ -315,9 +315,43 @@
     }
 
     function showPhotoModal(placeId) {
-      alert('Photo modal would show here for place: ' + placeId);
+    placesService.getDetails({
+        placeId: placeId,
+        fields: ['photos']
+    }, (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place.photos && place.photos.length > 0) {
+        // Create modal HTML
+        const modalHTML = `
+            <div id="photo-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-lg font-semibold">Business Photos</h3>
+                <button onclick="document.getElementById('photo-modal').remove()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                </div>
+                <div class="p-4 overflow-y-auto" style="max-height: calc(90vh - 60px)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${place.photos.map(photo => `
+                    <div class="rounded-lg overflow-hidden">
+                        <img src="${photo.getUrl({maxWidth: 800, maxHeight: 600})}" 
+                            alt="Business photo" 
+                            class="w-full h-auto object-cover">
+                    </div>
+                    `).join('')}
+                </div>
+                </div>
+            </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        } else {
+        alert('No photos available for this business');
+        }
+    });
     }
-
     function showNoResults() {
       showLoading(false);
       document.getElementById('no-results').classList.remove('hidden');
