@@ -231,24 +231,12 @@
     }
 
     async function sendFormData(formData) {
-      // const webhookUrl = 'https://end-point';
       
-      try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to send data');
-        }
-        
+      
+      try {        
         return await response.json();
       } catch (error) {
-        console.error('Error sending to webhook:', error);
+        console.error('Error is', error);
         console.log('Form Data:', formData);
         return { success: true, fallback: true };
       }
@@ -267,7 +255,7 @@
       // Log for debugging
       console.log('Form embedded on domain:', fullDomain);
       console.log('Extracted domain name:', urlDomain);
-      console.log('Iframe source:', window.location.href);
+      // console.log('Iframe source:', window.location.href);
       
       // Optional: Display a small indicator of where the form is embedded
       // You can uncomment this if you want to show the domain
@@ -278,46 +266,46 @@
       document.querySelector('.bg-white').appendChild(domainIndicator);
       */
       
-      queryForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
+      // queryForm.addEventListener('submit', async function(e) {
+      //   e.preventDefault();
         
-        submitButton.disabled = true;
-        submitButton.innerText = 'Sending...';
+      //   submitButton.disabled = true;
+      //   submitButton.innerText = 'Sending...';
         
-        const name = document.getElementById('name').value;
-        const email = document.getElementById('email').value;
-        const message = document.getElementById('message').value;
+      //   const name = document.getElementById('name').value;
+      //   const email = document.getElementById('email').value;
+      //   const message = document.getElementById('message').value;
         
-        const formData = {
-          name: name,
-          email: email,
-          message: message,
-          websiteDomain: fullDomain,           // The actual website domain where form is embedded
-          domainName: urlDomain,                // Domain name without TLD
-          iframeSource: window.location.hostname, // Your Vercel app domain (for reference)
-          pageUrl: document.referrer || 'Direct visit', // The page where form is embedded
-          timestamp: new Date().toISOString(),
-          formType: 'merchant_contact'
-        };
+      //   const formData = {
+      //     name: name,
+      //     email: email,
+      //     message: message,
+      //     websiteDomain: fullDomain,        
+      //     domainName: urlDomain,               
+      //     iframeSource: window.location.hostname, 
+      //     pageUrl: document.referrer || 'Direct visit',
+      //     timestamp: new Date().toISOString(),
+      //     formType: 'merchant_contact'
+      //   };
         
-        try {
-          await sendFormData(formData);
+      //   try {
+      //     await sendFormData(formData);
           
-          console.log('Form submitted with data:', formData);
+      //     console.log('Form submitted with data:', formData);
           
-          queryForm.classList.add('hidden');
-          successMessage.classList.remove('hidden');
-          successMessage.classList.add('animate-fade-in');
+      //     queryForm.classList.add('hidden');
+      //     successMessage.classList.remove('hidden');
+      //     successMessage.classList.add('animate-fade-in');
           
-          queryForm.reset();
-        } catch (error) {
-          console.error('Error submitting form:', error);
-          alert('There was an error submitting the form. Please try again.');
-        } finally {
-          submitButton.disabled = false;
-          submitButton.innerText = 'Send Message';
-        }
-      });
+      //     queryForm.reset();
+      //   } catch (error) {
+      //     console.error('Error submitting form:', error);
+      //     alert('There was an error submitting the form. Please try again.');
+      //   } finally {
+      //     submitButton.disabled = false;
+      //     submitButton.innerText = 'Send Message';
+      //   }
+      // });
       
       sendAnother.addEventListener('click', function() {
         successMessage.classList.add('hidden');
