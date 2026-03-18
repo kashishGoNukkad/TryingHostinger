@@ -162,44 +162,76 @@
   </div>
 
   <script>
-    // Function to extract domain name from URL without TLD
-    function extractDomainFromUrl() {
+    // Function to get the parent website URL (where the form is embedded)
+    function getParentDomain() {
       try {
-        const currentUrl = window.location.hostname;
-      
-        let domain = currentUrl.replace(/^www\./, '');
+        // Try to get the parent URL from document.referrer (works in most cases)
+        let parentUrl = document.referrer;
         
+        // If referrer is empty, try to get from window.parent.location (might be restricted by CORS)
+        if (!parentUrl && window.parent && window.parent.location) {
+          try {
+            parentUrl = window.parent.location.href;
+          } catch (e) {
+            // Cross-origin restriction - can't access parent location
+            console.log('Cannot access parent location due to CORS');
+          }
+        }
+        
+        // If we have a parent URL, extract the hostname
+        if (parentUrl) {
+          try {
+            const url = new URL(parentUrl);
+            return url.hostname.replace(/^www\./, '');
+          } catch (e) {
+            console.error('Error parsing parent URL:', e);
+          }
+        }
+        
+        // Fallback to a message asking to pass domain as parameter
+        // Check if domain is passed as URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const domainParam = urlParams.get('domain');
+        if (domainParam) {
+          return domainParam;
+        }
+        
+        // Last resort - return empty string and log warning
+        console.warn('Could not detect parent domain. Please pass ?domain=yourdomain.com in the iframe src');
+        return '';
+      } catch (error) {
+        console.error('Error getting parent domain:', error);
+        return '';
+      }
+    }
+
+    // Function to extract domain name from URL without TLD
+    function extractDomainFromUrl(hostname) {
+      try {
+        if (!hostname) return '';
+        
+        let domain = hostname.replace(/^www\./, '');
         const domainParts = domain.split('.');
-        
-        // Get the main domain name (usually the second last part if it's a common TLD)
-        let domainName = '';
         
         if (domainParts.length >= 2) {
           const commonMultiTLDs = ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac'];
           
           if (domainParts.length >= 3 && commonMultiTLDs.includes(domainParts[domainParts.length - 2])) {
-            domainName = domainParts[0];
+            return domainParts[0];
           } else {
-            // For domains like example.com -> take 'example'
-            domainName = domainParts[0];
+            return domainParts[0];
           }
         }
         
-        return domainName;
+        return domain;
       } catch (error) {
         console.error('Error extracting domain from URL:', error);
         return '';
       }
     }
 
-    // Function to get full domain with TLD
-    function getFullDomain() {
-      return window.location.hostname.replace(/^www\./, '');
-    }
-
     async function sendFormData(formData) {
       // const webhookUrl = 'https://end-point';
-      
       
       try {
         const response = await fetch(webhookUrl, {
@@ -228,11 +260,23 @@
       const submitButton = document.getElementById('submitButton');
       const sendAnother = document.getElementById('sendAnother');
       
-      const urlDomain = extractDomainFromUrl();
-      const fullDomain = getFullDomain();
+      // Get the parent domain (where the form is embedded)
+      const fullDomain = getParentDomain();
+      const urlDomain = extractDomainFromUrl(fullDomain);
       
-      // console.log('Current domain:', fullDomain);
-      // console.log('Extracted domain name:', urlDomain);
+      // Log for debugging
+      console.log('Form embedded on domain:', fullDomain);
+      console.log('Extracted domain name:', urlDomain);
+      console.log('Iframe source:', window.location.href);
+      
+      // Optional: Display a small indicator of where the form is embedded
+      // You can uncomment this if you want to show the domain
+      /*
+      const domainIndicator = document.createElement('div');
+      domainIndicator.className = 'text-xs text-gray-400 text-center mt-2';
+      domainIndicator.textContent = `Form loaded from: ${fullDomain || 'Unknown domain'}`;
+      document.querySelector('.bg-white').appendChild(domainIndicator);
+      */
       
       queryForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -248,9 +292,10 @@
           name: name,
           email: email,
           message: message,
-          urlDomainName: urlDomain,
-          fullDomain: fullDomain,
-          pageUrl: window.location.href, // Full page URL
+          websiteDomain: fullDomain,           // The actual website domain where form is embedded
+          domainName: urlDomain,                // Domain name without TLD
+          iframeSource: window.location.hostname, // Your Vercel app domain (for reference)
+          pageUrl: document.referrer || 'Direct visit', // The page where form is embedded
           timestamp: new Date().toISOString(),
           formType: 'merchant_contact'
         };
@@ -258,14 +303,7 @@
         try {
           await sendFormData(formData);
           
-          console.log('Form submitted with data:', {
-            name,
-            email,
-            message,
-            urlDomainName: urlDomain,
-            fullDomain: fullDomain,
-            pageUrl: window.location.href
-          });
+          console.log('Form submitted with data:', formData);
           
           queryForm.classList.add('hidden');
           successMessage.classList.remove('hidden');
