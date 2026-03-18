@@ -162,81 +162,16 @@
   </div>
 
   <script>
-    // Function to extract domain name from URL without TLD
-    function extractDomainFromUrl() {
-      try {
-        const currentUrl = window.location.hostname;
-      
-        let domain = currentUrl.replace(/^www\./, '');
-        
-        const domainParts = domain.split('.');
-        
-        // Get the main domain name (usually the second last part if it's a common TLD)
-        let domainName = '';
-        
-        if (domainParts.length >= 2) {
-          const commonMultiTLDs = ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac'];
-          
-          if (domainParts.length >= 3 && commonMultiTLDs.includes(domainParts[domainParts.length - 2])) {
-            domainName = domainParts[0];
-          } else {
-            // For domains like example.com -> take 'example'
-            domainName = domainParts[0];
-          }
-        }
-        
-        return domainName;
-      } catch (error) {
-        console.error('Error extracting domain from URL:', error);
-        return '';
-      }
-    }
-
-    // Function to get full domain with TLD
-    function getFullDomain() {
-      return window.location.hostname.replace(/^www\./, '');
-    }
-
-    async function sendFormData(formData) {
-      // const webhookUrl = 'https://end-point';
-      
-      
-      try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData)
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to send data');
-        }
-        
-        return await response.json();
-      } catch (error) {
-        console.error('Error sending to webhook:', error);
-        console.log('Form Data:', formData);
-        return { success: true, fallback: true };
-      }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
-      const queryForm = document.getElementById('queryForm');
+      const contactForm = document.getElementById('contactForm');
       const successMessage = document.getElementById('successMessage');
       const submitButton = document.getElementById('submitButton');
       const sendAnother = document.getElementById('sendAnother');
       
-      const urlDomain = extractDomainFromUrl();
-      const fullDomain = getFullDomain();
-      
-      // console.log('Current domain:', fullDomain);
-      // console.log('Extracted domain name:', urlDomain);
-      
-      queryForm.addEventListener('submit', async function(e) {
+      contactForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
+        // Disable button and show loading state
         submitButton.disabled = true;
         submitButton.innerText = 'Sending...';
         
@@ -244,46 +179,27 @@
         const email = document.getElementById('email').value;
         const message = document.getElementById('message').value;
         
-        const formData = {
-          name: name,
-          email: email,
-          message: message,
-          urlDomainName: urlDomain,
-          fullDomain: fullDomain,
-          pageUrl: window.location.href, // Full page URL
-          timestamp: new Date().toISOString(),
-          formType: 'merchant_contact'
-        };
-        
-        try {
-          await sendFormData(formData);
+        // Simulate API call with timeout
+        setTimeout(function() {
+          // Log form data (replace with actual form submission)
+          console.log({ name, email, message });
           
-          console.log('Form submitted with data:', {
-            name,
-            email,
-            message,
-            urlDomainName: urlDomain,
-            fullDomain: fullDomain,
-            pageUrl: window.location.href
-          });
-          
-          queryForm.classList.add('hidden');
+          // Hide form and show success message
+          contactForm.classList.add('hidden');
           successMessage.classList.remove('hidden');
           successMessage.classList.add('animate-fade-in');
           
-          queryForm.reset();
-        } catch (error) {
-          console.error('Error submitting form:', error);
-          alert('There was an error submitting the form. Please try again.');
-        } finally {
+          // Reset form
+          contactForm.reset();
           submitButton.disabled = false;
           submitButton.innerText = 'Send Message';
-        }
+        }, 1000);
       });
       
+      // Handle "Send another message" button click
       sendAnother.addEventListener('click', function() {
         successMessage.classList.add('hidden');
-        queryForm.classList.remove('hidden');
+        contactForm.classList.remove('hidden');
       });
     });
   </script>
